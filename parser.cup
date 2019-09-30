@@ -1,0 +1,97 @@
+/* Simple +/-/* expression language; parser evaluates constant expressions on the fly*/
+/**
+ *  Package and Import Specifications
+ */
+import java_cup.runtime.*;
+
+/**
+ *  Usercode Components
+ */
+parser code {:
+    // Connect this parser to a scanner!
+    Scanner s;
+    Parser(Scanner s){ this.s=s; }
+:}
+
+/* define how to connect to the scanner! */
+scan with {: return s.next_token(); :};
+
+/**
+ *  Symbol Lists
+ */
+
+/* Terminals (tokens returned by the scanner). */
+terminal            LBRACE,RBRACE,SUFFIX,PREFIX,IF,ELSE,CONCAT,LPAREN, RPAREN,COM;
+terminal String     CONSTANT , ID;
+/*terminal Integer    NUMBER;        // our scanner provides numbers as integers*/
+
+/*  Non terminals */
+non terminal            Program,Decl,Decls,MainCalls,MainCall,maincallArgs,maincallArgs2,A,B,ARGUMENTS,COND,exprs,expr,callindeclArgs2,ifExpr,CallInDecl,callindeclArgs;
+
+/**
+ *  Precedence Declarations
+ */
+ precedence left COM,CONCAT;
+
+/**
+ *  The Grammar Rules
+ */
+
+
+Program   ::= Decls:pr                            {: System.out.println("import java.util.*;\npublic class Main{\n"+pr+"\n}\n"); :};
+
+Decls     ::= Decl:decl Decls:decls2              {: RESULT = decl + "" +decls2; :}
+              |MainCalls:cs                       {: RESULT = "public static void main(String[] args){\n"+cs+"\n}\n"; :};
+
+MainCalls     ::= MainCall:c MainCalls:c2         {: RESULT = "System.out.println("+c+");\n" + "" +c2; :}
+              |                                   {: RESULT = ""; :}
+              ;
+Decl      ::= A:a B:b                             {: RESULT= "public static String "+ a+""+b; :};
+
+MainCall      ::= ID:id LPAREN maincallArgs:s RPAREN          {: RESULT = id + "(" + s + ")"; :}
+              |ID:id LPAREN RPAREN                            {: RESULT = id + "()"; :};
+
+A         ::= ID:id LPAREN ARGUMENTS:s RPAREN                 {: RESULT = id + "(" + s + ")"; :}
+              |ID:id LPAREN RPAREN                            {: RESULT = id + "()"; :};
+
+B         ::= LBRACE exprs:body RBRACE                        {: RESULT = "{\n return(" + body + ");\n}\n"; :};
+
+ifExpr    ::= IF LPAREN COND:c RPAREN exprs:d1 ELSE exprs:d2  {: RESULT = c+"?"+d1+":"+d2; :};
+
+COND      ::= exprs:w1 SUFFIX exprs:w2                    {: RESULT = "("+w2+").endsWith("+w1+")";    :}
+              | exprs:w1 PREFIX exprs:w2                  {: RESULT = "("+w2+").startsWith("+w1+")";  :};
+
+exprs      ::= exprs:es CONCAT expr:e             {: RESULT = es+"+"+e;  :}
+              |expr:e                             {: RESULT = e;         :};
+
+expr       ::= ID:id                              {: RESULT = id;         :}
+              | CONSTANT:c                        {: RESULT = c;          :}
+              | CallInDecl:a                      {: RESULT = a;          :}
+              | ifExpr:e                          {: RESULT = "("+e+")";          :};
+
+/*kanones gia tis kliseis sinartisewn mesa se diloseis sinartisewn*/
+CallInDecl ::= ID:id LPAREN callindeclArgs:cd RPAREN          {: RESULT = id+"("+cd+")"; :}
+                | ID:id LPAREN RPAREN                         {: RESULT = id+"()";        :};
+
+callindeclArgs ::= callindeclArgs:cda COM callindeclArgs2:cda2 {: RESULT = cda+","+cda2;   :}
+                  |callindeclArgs2:cd                          {: RESULT = cd;             :};
+
+callindeclArgs2 ::= callindeclArgs2:cd CONCAT ID:id                 {: RESULT = "("+cd+"+"+id+")";    :}
+                    |callindeclArgs2:cd CONCAT CONSTANT:c           {: RESULT = "("+cd+"+"+c+")";     :}
+                    |callindeclArgs2:cida CONCAT CallInDecl:cid     {: RESULT = "("+cida+"+"+cid+")"; :}
+                    | ID:id                                         {: RESULT = id;         :}
+                    |CONSTANT:c                                     {: RESULT = c;          :}
+                    |CallInDecl:cid                                 {: RESULT = cid;        :};
+
+/*kanones gia ta orismata stis kliseis sinartisewn stin main*/
+maincallArgs  ::= maincallArgs:mca COM maincallArgs2:a                 {: RESULT = mca + "," +a;:}
+                  | maincallArgs2:mca                                  {: RESULT = mca;    :};
+
+maincallArgs2 ::= maincallArgs2:mca CONCAT CONSTANT:c               {: RESULT = "("+mca+"+"+c+")";   :}
+                  |maincallArgs2:mca CONCAT MainCall:mc             {: RESULT = "("+mca+"+"+mc+")";  :}
+                  |CONSTANT:c                                       {: RESULT = c;        :}
+                  |MainCall:mc                                      {: RESULT = mc;        :};
+/*kanones gia ta orismata stis diloseis sinartisewn*/
+ARGUMENTS  ::=  ARGUMENTS:args COM ID:id        {: RESULT = args + ",String " +id;  :}
+              | ID:id                           {: RESULT = "String "+id;             :}
+              ;
